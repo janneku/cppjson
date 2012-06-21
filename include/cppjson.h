@@ -13,6 +13,7 @@
 #include <vector>
 #include <istream>
 #include <ostream>
+#include <stdint.h>
 #include <stdexcept>
 #include <assert.h>
 
@@ -63,9 +64,16 @@ public:
 		verify_type(JSON_STRING);
 		return *m_value.string;
 	}
-	double as_integer() const
+	int as_integer() const
 	{
 		verify_type(JSON_INTEGER);
+		if (int(m_value.integer) != m_value.integer) {
+			throw type_error("Too large a integer");
+		}
+		return m_value.integer;
+	}
+	int64_t as_int64() const
+	{
 		return m_value.integer;
 	}
 	bool as_boolean() const
@@ -140,7 +148,7 @@ private:
 	Type m_type;
 	union {
 		std::string *string;
-		int integer;
+		int64_t integer;
 		bool boolean;
 		object_map_t *object;
 		std::vector<Value> *array;
