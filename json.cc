@@ -9,6 +9,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sstream>
 
 #define FOR_EACH_CONST(type, i, cont)		\
 	for (type::const_iterator i = (cont).begin(); i != (cont).end(); ++i)
@@ -207,9 +208,23 @@ std::string load_string(std::istream &is)
 			case 'r':
 				c = '\r';
 				break;
+			case 'u':
+				{
+					char code[5];
+					code[4] = 0;
+					is.read(code, 4);
+					if (is.eof()) {
+						throw decode_error("Unexpected end of input");
+					}
+					std::istringstream parser(code);
+					parser >> std::hex >> c;
+					if (!parser) {
+						throw decode_error("Invalid unicode");
+					}
+				}
+				break;
 			default:
 				/* pass through */
-				/* TODO: handle unicode uXXXX */
 				break;
 			}
 		}
