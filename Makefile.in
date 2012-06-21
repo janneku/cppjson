@@ -1,0 +1,20 @@
+CXX = {CXX}
+CXXFLAGS = -W -Wall -O2 -g -shared -fPIC -Iinclude
+EXECXXFLAGS = -W -Wall -O2 -g -Iinclude
+PREFIX = {PREFIX}
+LIBPATH = {LIBPATH}
+
+LIBRARY = libcppjson.so
+
+all: $(LIBRARY) test
+
+test: test.cc $(LIBRARY)
+	$(CXX) $(EXECXXFLAGS) -o $@ test.cc -L. -Wl,-rpath,. -lcppjson
+
+$(LIBRARY): json.o
+	 $(CXX) $(CXXFLAGS) -shared -fPIC -o $@ json.o
+
+install:
+	mkdir -p -m 755 "$(LIBPATH)" "$(PREFIX)/include"
+	install -m 644 include/*.h "$(PREFIX)/include"
+	install -m 644 $(LIBRARY) "$(LIBPATH)"

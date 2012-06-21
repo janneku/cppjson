@@ -1,0 +1,4 @@
+*.o
+Makefile
+libcppjson.so
+test

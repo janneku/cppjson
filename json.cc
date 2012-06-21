@@ -1,0 +1,412 @@
+/*
+ * cppjson - JSON (de)serialization library for C++ and STL
+ *
+ * Copyright 2012 Janne Kulmala <janne.t.kulmala@iki.fi>
+ *
+ * Program code is licensed with GNU LGPL 2.1. See COPYING.LGPL file.
+ */
+#include "cppjson.h"
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#define FOR_EACH_CONST(type, i, cont)		\
+	for (type::const_iterator i = (cont).begin(); i != (cont).end(); ++i)
+
+namespace json {
+
+/* Format a string, similar to sprintf() */
+const std::string strf(const char *fmt, ...)
+{
+	va_list vl;
+	va_start(vl, fmt);
+	char *buf = NULL;
+	vasprintf(&buf, fmt, vl);
+	va_end(vl);
+	std::string s(buf);
+	free(buf);
+	return s;
+}
+
+static const char *type_names[] = {
+	"null",
+	"string",
+	"integer",
+	"boolean",
+	"object",
+	"array",
+};
+
+Value::Value(Type type) :
+	m_type(type)
+{
+	switch (m_type) {
+	case JSON_OBJECT:
+		m_value.object = new object_map_t;
+		break;
+	case JSON_ARRAY:
+		m_value.array = new std::vector<Value>;
+		break;
+	case JSON_NULL:
+		break;
+	default:
+		/* other types can not be constructed */
+		assert(0);
+	}
+}
+
+Value::Value(const std::string &s) :
+	m_type(JSON_STRING)
+{
+	m_value.string = new std::string(s);
+}
+
+Value::Value(int i) :
+	m_type(JSON_INTEGER)
+{
+	m_value.integer = i;
+}
+
+Value::Value(bool b) :
+	m_type(JSON_BOOLEAN)
+{
+	m_value.boolean = b;
+}
+
+Value::Value(const object_map_t &object) :
+	m_type(JSON_OBJECT)
+{
+	m_value.object = new object_map_t(object);
+}
+
+Value::Value(const std::vector<Value> &array) :
+	m_type(JSON_ARRAY)
+{
+	m_value.array = new std::vector<Value>(array);
+}
+
+Value::Value(const Value &from) :
+	m_type(JSON_NULL)
+{
+	*this = from;
+}
+
+Value::~Value()
+{
+	destroy();
+}
+
+void Value::destroy()
+{
+	switch (m_type) {
+	case JSON_STRING:
+		delete m_value.string;
+		break;
+	case JSON_OBJECT:
+		delete m_value.object;
+		break;
+	case JSON_ARRAY:
+		delete m_value.array;
+		break;
+	case JSON_NULL:
+	case JSON_BOOLEAN:
+	case JSON_INTEGER:
+		break;
+	}
+	m_type = JSON_NULL;
+}
+
+void Value::verify_type(Type expected) const
+{
+	if (expected != m_type) {
+		throw type_error(strf("Expected type %s, but got %s",
+				 type_names[expected], type_names[m_type]));
+	}
+}
+
+void Value::operator = (const Value &from)
+{
+	destroy();
+	m_type = from.m_type;
+	switch (m_type) {
+	case JSON_NULL:
+		break;
+	case JSON_STRING:
+		m_value.string = new std::string(*from.m_value.string);
+		break;
+	case JSON_OBJECT:
+		m_value.object = new object_map_t(*from.m_value.object);
+		break;
+	case JSON_ARRAY:
+		m_value.array = new std::vector<Value>(*from.m_value.array);
+		break;
+	case JSON_INTEGER:
+		m_value.integer = from.m_value.integer;
+		break;
+	case JSON_BOOLEAN:
+		m_value.boolean = from.m_value.boolean;
+		break;
+	default:
+		assert(0);
+	}
+}
+
+bool Value::operator == (const Value &other) const
+{
+	if (m_type != other.m_type)
+		return false;
+	switch (m_type) {
+	case JSON_NULL:
+		return true;
+	case JSON_STRING:
+		return *m_value.string == *other.m_value.string;
+	case JSON_OBJECT:
+		return *m_value.object == *other.m_value.object;
+	case JSON_ARRAY:
+		return *m_value.array == *other.m_value.array;
+	case JSON_INTEGER:
+		return m_value.integer == other.m_value.integer;
+	case JSON_BOOLEAN:
+		return m_value.boolean == other.m_value.boolean;
+	default:
+		assert(0);
+	}
+}
+
+bool Value::operator != (const Value &other) const
+{
+	return !(*this == other);
+}
+
+std::string load_string(std::istream &is)
+{
+	int c = is.get();
+	if (is.eof()) {
+		throw decode_error("Unexpected end of input");
+	}
+	if (c != '"') {
+		throw decode_error("Expected a string");
+	}
+	std::string str;
+	while (1) {
+		c = is.get();
+		if (is.eof()) {
+			throw decode_error("Unexpected end of input");
+		}
+		if (c == '"')
+			break;
+		if (c == '\\') {
+			c = is.get();
+			if (is.eof()) {
+				throw decode_error("Unexpected end of input");
+			}
+			switch (c) {
+			case 'n':
+				c = '\n';
+				break;
+			case 'r':
+				c = '\r';
+				break;
+			default:
+				/* pass through */
+				/* TODO: handle unicode uXXXX */
+				break;
+			}
+		}
+		str += char(c);
+	}
+	return str;
+}
+
+void write_string(std::ostream &os, const std::string &str)
+{
+	os.put('"');
+	for (size_t i = 0; i < str.size(); ++i) {
+		int c = str[i];
+		switch (c) {
+		case '\n':
+			os.put('\\');
+			c = 'n';
+			break;
+		case '\r':
+			os.put('\\');
+			c = 'r';
+			break;
+		case '"':
+		case '\\':
+			os.put('\\');
+			break;
+		default:
+			break;
+		}
+		os.put(c);
+	}
+	os.put('"');
+}
+
+void Value::load(std::istream &is)
+{
+	destroy();
+	int c = is.peek();
+	while (!is.eof() && isspace(c)) {
+		is.get();
+		c = is.peek();
+	}
+	if (is.eof()) {
+		throw decode_error("Unexpected end of input");
+	}
+	switch (c) {
+	case '{':
+		is.get();
+		m_type = JSON_OBJECT;
+		m_value.object = new object_map_t;
+		while (1) {
+			c = is.peek();
+			while (!is.eof() && isspace(c)) {
+				is.get();
+				c = is.peek();
+			}
+			if (c == '}') {
+				is.get();
+				break;
+			}
+			std::string key = load_string(is);
+			c = is.get();
+			while (!is.eof() && isspace(c)) {
+				c = is.get();
+			}
+			if (c != ':') {
+				throw decode_error("Expected ':'");
+			}
+			Value val;
+			val.load(is);
+			m_value.object->insert(std::make_pair(key, val));
+
+			c = is.get();
+			while (!is.eof() && isspace(c)) {
+				c = is.get();
+			}
+			if (c == '}') {
+				break;
+			} else if (c != ',') {
+				throw decode_error("Expected ',' or '}'");
+			}
+		}
+		break;
+
+	case '[':
+		is.get();
+		m_type = JSON_ARRAY;
+		m_value.array = new std::vector<Value>;
+		while (1) {
+			c = is.peek();
+			while (!is.eof() && isspace(c)) {
+				is.get();
+				c = is.peek();
+			}
+			if (c == ']') {
+				is.get();
+				break;
+			}
+			Value val;
+			val.load(is);
+			m_value.array->push_back(val);
+
+			c = is.get();
+			while (!is.eof() && isspace(c)) {
+				c = is.get();
+			}
+			if (c == ']') {
+				break;
+			} else if (c != ',') {
+				throw decode_error("Expected ',' or ']'");
+			}
+		}
+		break;
+
+	case '"':
+		m_value.string = new std::string(load_string(is));
+		m_type = JSON_STRING;
+		break;
+	default:
+		if ((c >= '0' && c <= '9') || c == '-') {
+			m_type = JSON_INTEGER;
+			is >> m_value.integer;
+			if (!is) {
+				throw decode_error("Invalid integer");
+			}
+		} else if (isalpha(c)) {
+			std::string str;
+			while (!is.eof() && isalpha(c)) {
+				str += char(tolower(c));
+				is.get();
+				c = is.peek();
+			}
+			if (str == "true") {
+				m_type = JSON_BOOLEAN;
+				m_value.boolean = true;
+			} else if (str == "false") {
+				m_type = JSON_BOOLEAN;
+				m_value.boolean = false;
+			} else if (str == "null") {
+				m_type = JSON_NULL;
+			} else {
+				throw decode_error("Unknown keyword in input");
+			}
+		} else {
+			throw decode_error("Unknown character in input");
+		}
+	}
+}
+
+void Value::load_all(std::istream &is)
+{
+	load(is);
+	int c = is.peek();
+	while (!is.eof() && isspace(c)) {
+		is.get();
+		c = is.peek();
+	}
+	if (!is.eof()) {
+		throw decode_error("Left over data in input");
+	}
+}
+
+void Value::write(std::ostream &os) const
+{
+	switch (m_type) {
+	case JSON_STRING:
+		write_string(os, *m_value.string);
+		break;
+	case JSON_OBJECT:
+		os.put('{');
+		FOR_EACH_CONST(object_map_t, i, *m_value.object) {
+			if (i != m_value.object->begin())
+				os.put(',');
+			write_string(os, i->first);
+			os.put(':');
+			i->second.write(os);
+		}
+		os.put('}');
+		break;
+	case JSON_ARRAY:
+		os.put('[');
+		FOR_EACH_CONST(std::vector<Value>, i, *m_value.array) {
+			if (i != m_value.array->begin())
+				os.put(',');
+			i->write(os);
+		}
+		os.put(']');
+		break;
+	case JSON_INTEGER:
+		os << m_value.integer;
+		break;
+	case JSON_BOOLEAN:
+		os << (m_value.boolean ? "true" : "false");
+		break;
+	default:
+		assert(0);
+	}
+}
+
+}
