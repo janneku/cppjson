@@ -2,3 +2,4 @@
 Makefile
 libcppjson.so
 test
+example

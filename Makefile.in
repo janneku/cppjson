@@ -6,10 +6,13 @@ LIBPATH = {LIBPATH}
 
 LIBRARY = libcppjson.so
 
-all: $(LIBRARY) test
+all: $(LIBRARY) test example
 
 test: test.cc $(LIBRARY)
 	$(CXX) $(EXECXXFLAGS) -o $@ test.cc -L. -Wl,-rpath,. -lcppjson
+
+example: example.cc $(LIBRARY)
+	$(CXX) $(EXECXXFLAGS) -o $@ example.cc -L. -Wl,-rpath,. -lcppjson -lcurl
 
 $(LIBRARY): json.o
 	 $(CXX) $(CXXFLAGS) -shared -fPIC -o $@ json.o
