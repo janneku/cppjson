@@ -33,6 +33,7 @@ static const char *type_names[] = {
 	"null",
 	"string",
 	"integer",
+	"floating",
 	"boolean",
 	"object",
 	"array",
@@ -66,6 +67,12 @@ Value::Value(int i) :
 	m_type(JSON_INTEGER)
 {
 	m_value.integer = i;
+}
+
+Value::Value(double d) :
+	m_type(JSON_FLOATING)
+{
+	m_value.floating = d;
 }
 
 Value::Value(bool b) :
@@ -112,6 +119,7 @@ void Value::destroy()
 	case JSON_NULL:
 	case JSON_BOOLEAN:
 	case JSON_INTEGER:
+	case JSON_FLOATING:
 		break;
 	}
 	m_type = JSON_NULL;
@@ -144,6 +152,9 @@ void Value::operator = (const Value &from)
 	case JSON_INTEGER:
 		m_value.integer = from.m_value.integer;
 		break;
+	case JSON_FLOATING:
+		m_value.floating = from.m_value.floating;
+		break;
 	case JSON_BOOLEAN:
 		m_value.boolean = from.m_value.boolean;
 		break;
@@ -152,9 +163,16 @@ void Value::operator = (const Value &from)
 	}
 }
 
+Type cmp_type(Type type)
+{
+	if (type == JSON_INTEGER)
+		return JSON_FLOATING;
+	return type;
+}
+
 bool Value::operator == (const Value &other) const
 {
-	if (m_type != other.m_type)
+	if (cmp_type(m_type) != cmp_type(other.m_type))
 		return false;
 	switch (m_type) {
 	case JSON_NULL:
@@ -166,7 +184,15 @@ bool Value::operator == (const Value &other) const
 	case JSON_ARRAY:
 		return *m_value.array == *other.m_value.array;
 	case JSON_INTEGER:
-		return m_value.integer == other.m_value.integer;
+		if (other.m_type == JSON_INTEGER)
+			return m_value.integer == other.m_value.integer;
+		else
+			return m_value.integer == other.m_value.floating;
+	case JSON_FLOATING:
+		if (other.m_type == JSON_INTEGER)
+			return m_value.floating == other.m_value.integer;
+		else
+			return m_value.floating == other.m_value.floating;
 	case JSON_BOOLEAN:
 		return m_value.boolean == other.m_value.boolean;
 	default:
@@ -345,10 +371,46 @@ void Value::load(std::istream &is)
 		break;
 	default:
 		if ((c >= '0' && c <= '9') || c == '-') {
-			m_type = JSON_INTEGER;
-			is >> m_value.integer;
-			if (!is) {
-				throw decode_error("Invalid integer");
+			/*
+			 * We need first to parse the number to a buffer to
+			 * decide if it's a float or an intger.
+			 */
+			std::string str;
+			if (c == '-') {
+				str += char(c);
+				is.get();
+				c = is.peek();
+				if (c < '0' || c > '9') {
+					throw decode_error("Expected a digit");
+				}
+			}
+			while (!is.eof() && isdigit(c)) {
+				str += char(c);
+				is.get();
+				c = is.peek();
+			}
+			if (c == '.') {
+				str += char(c);
+				is.get();
+				c = is.peek();
+				while (!is.eof() && isdigit(c)) {
+					str += char(c);
+					is.get();
+					c = is.peek();
+				}
+				std::istringstream parser(str);
+				m_type = JSON_FLOATING;
+				parser >> m_value.floating;
+				if (!parser) {
+					throw decode_error("Invalid integer");
+				}
+			} else {
+				std::istringstream parser(str);
+				m_type = JSON_INTEGER;
+				parser >> m_value.integer;
+				if (!parser) {
+					throw decode_error("Invalid integer");
+				}
 			}
 		} else if (isalpha(c)) {
 			std::string str;
@@ -415,6 +477,9 @@ void Value::write(std::ostream &os) const
 		break;
 	case JSON_INTEGER:
 		os << m_value.integer;
+		break;
+	case JSON_FLOATING:
+		os << m_value.floating;
 		break;
 	case JSON_BOOLEAN:
 		os << (m_value.boolean ? "true" : "false");

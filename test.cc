@@ -35,10 +35,14 @@ int main()
 {
 	verify(1234, "1234");
 	verify(-1234, "-1234");
+	verify(1234, "1234.");
+	verify(1234.0, "1234");
+	verify(1234.56, "1234.56");
+	verify(-1234.56, "-1234.56");
 	verify(1234, "\t1234 \n");
 	verify(std::string("foobar"), "\"foobar\"");
 	verify(std::string(""), "\"\"");
-	verify(std::string(" \r\n \"\\"), "\" \\r\\n \\\"\\\\\" ");
+	verify(std::string(" /\r\n \"\\"), "\" \\/\\r\\n \\\"\\\\\" ");
 	verify(true, "true");
 	verify(false, "false");
 
@@ -47,15 +51,18 @@ int main()
 
 	arr.push_back(std::string("foo"));
 	arr.push_back(1234);
+	arr.push_back(-1234.56);
 	arr.push_back(true);
-	verify(arr, "[\"foo\",\n 1234,\n true] ");
+	verify(arr, "[\"foo\",\n 1234,\t-1234.56\n, true] ");
 
 	json::object_map_t obj;
+	verify(obj, "{}");
 	obj.insert(std::make_pair("bar", arr));
 	obj.insert(std::make_pair("foo", std::string("test")));
-	verify(obj, "{\"bar\" :[ \"foo\" ,1234,true, ], \"foo\": \"test\"}\n");
+	verify(obj, "{\"bar\" :[ \"foo\" ,1234,-1234.56, true, ], \"foo\": \"test\"}\n");
 
 	verify_error("foobar", "Unknown keyword in input");
+	verify_error("-foo", "Expected a digit");
 	verify_error("trueorfalse", "Unknown keyword in input");
 	verify_error("\"foobar", "Unexpected end of input");
 	verify_error("[,] ", "Unknown character in input");
@@ -63,7 +70,7 @@ int main()
 	verify_error(" [1 2]", "Expected ',' or ']'");
 	verify_error("{\"foo\": ,} ", "Unknown character in input");
 	verify_error("{ \"foo\": 1234, ", "Unexpected end of input");
-	verify_error("{1234}", "Expected a string");
+	verify_error("{1234.56}", "Expected a string");
 	verify_error("{\"a\": [] ", "Expected ',' or '}'");
 	verify_error("{\"a\" 5 ", "Expected ':'");
 	verify_error("11111111111111111111", "Invalid integer");

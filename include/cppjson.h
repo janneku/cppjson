@@ -38,6 +38,7 @@ enum Type {
 	JSON_NULL,
 	JSON_STRING,
 	JSON_INTEGER,
+	JSON_FLOATING,
 	JSON_BOOLEAN,
 	JSON_OBJECT,
 	JSON_ARRAY,
@@ -51,6 +52,7 @@ public:
 	Value(Type type = JSON_NULL);
 	Value(const std::string &s);
 	Value(int i);
+	Value(double d);
 	Value(bool b);
 	Value(const object_map_t &object);
 	Value(const std::vector<Value> &array);
@@ -74,7 +76,16 @@ public:
 	}
 	int64_t as_int64() const
 	{
+		verify_type(JSON_INTEGER);
 		return m_value.integer;
+	}
+	double as_double() const
+	{
+		/* treat integers as numbers too */
+		if (m_type == JSON_INTEGER)
+			return m_value.integer;
+		verify_type(JSON_FLOATING);
+		return m_value.floating;
 	}
 	bool as_boolean() const
 	{
@@ -149,6 +160,7 @@ private:
 	union {
 		std::string *string;
 		int64_t integer;
+		double floating;
 		bool boolean;
 		object_map_t *object;
 		std::vector<Value> *array;
