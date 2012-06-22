@@ -23,7 +23,7 @@ size_t write_func(void *ptr, size_t size, size_t nmemb, void *userdata)
 }
 
 int main(int argc, char **argv)
-{
+try {
 	if (argc < 2) {
 		printf("Usage: %s [screen name]\n", argv[0]);
 		return 0;
@@ -33,13 +33,18 @@ int main(int argc, char **argv)
 
 	std::string url = "https://api.twitter.com/1/statuses/user_timeline.json?screen_name=" + screen_name;
 
+	char error[CURL_ERROR_SIZE];
 	std::string result;
 	CURL *curl = curl_easy_init();
 	curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_func);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
+	curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, error);
 	int res = curl_easy_perform(curl);
 	curl_easy_cleanup(curl);
+	if (res) {
+		throw std::runtime_error(error);
+	}
 
 	json::Value doc;
 	std::istringstream parser(result);
@@ -51,4 +56,8 @@ int main(int argc, char **argv)
 		printf("<%s> %s\n", created.c_str(), text.c_str());
 	}
 	return 0;
+
+} catch (const std::runtime_error &e) {
+	fprintf(stderr, "Load error: %s\n", e.what());
+	return 1;
 }
