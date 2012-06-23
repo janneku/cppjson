@@ -153,7 +153,7 @@ public:
 	void load(std::istream &is);
 	void load_all(std::istream &is);
 
-	void write(std::ostream &os) const;
+	void write(std::ostream &os, int indent=0) const;
 
 private:
 	Type m_type;

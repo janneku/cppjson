@@ -482,20 +482,34 @@ void Value::load_all(std::istream &is)
 	}
 }
 
-void Value::write(std::ostream &os) const
+void Value::write(std::ostream &os, int indent) const
 {
+	static int depth = 0;
+
 	switch (m_type) {
 	case JSON_STRING:
 		write_string(os, *m_value.string);
 		break;
 	case JSON_OBJECT:
 		os.put('{');
+		depth++;
 		FOR_EACH_CONST(object_map_t, i, *m_value.object) {
 			if (i != m_value.object->begin())
-				os.put(',');
+				os << ", ";
+			if (indent) {
+				os.put('\n');
+				for (int n = 0; n < indent * depth; ++n)
+					os.put(' ');
+			}
 			write_string(os, i->first);
-			os.put(':');
-			i->second.write(os);
+			os << ": ";
+			i->second.write(os, indent);
+		}
+		depth--;
+		if (indent) {
+			os.put('\n');
+			for (int n = 0; n < indent * depth; ++n)
+				os.put(' ');
 		}
 		os.put('}');
 		break;
@@ -503,8 +517,8 @@ void Value::write(std::ostream &os) const
 		os.put('[');
 		FOR_EACH_CONST(std::vector<Value>, i, *m_value.array) {
 			if (i != m_value.array->begin())
-				os.put(',');
-			i->write(os);
+				os << ", ";
+			i->write(os, indent);
 		}
 		os.put(']');
 		break;
