@@ -29,6 +29,30 @@ const std::string strf(const char *fmt, ...)
 	return s;
 }
 
+size_t encode_utf8(int c, uint8_t *buffer)
+{
+	if (c < 0x80) {
+		buffer[0] = c;
+		return 1;
+	} else if (c < 0x800) {
+		buffer[0] = 0xC0 + ((c & 0x7C0) >> 6);
+		buffer[1] = 0x80 + ((c & 0x03F));
+		return 2;
+	} else if (c < 0x10000) {
+		buffer[0] = 0xE0 + ((c & 0xF000) >> 12);
+		buffer[1] = 0x80 + ((c & 0x0FC0) >> 6);
+		buffer[2] = 0x80 + ((c & 0x003F));
+		return 3;
+	} else if (c <= 0x10FFFF) {
+		buffer[0] = 0xF0 + ((c & 0x1C0000) >> 18);
+		buffer[1] = 0x80 + ((c & 0x03F000) >> 12);
+		buffer[2] = 0x80 + ((c & 0x000FC0) >> 6);
+		buffer[3] = 0x80 + ((c & 0x00003F));
+		return 4;
+	}
+	return 0;
+}
+
 static const char *type_names[] = {
 	"null",
 	"string",
@@ -234,6 +258,11 @@ std::string load_string(std::istream &is)
 			case 'r':
 				c = '\r';
 				break;
+			case '\\':
+			case '/':
+			case '"':
+				/* pass through */
+				break;
 			case 'u':
 				{
 					char code[5];
@@ -250,11 +279,15 @@ std::string load_string(std::istream &is)
 				}
 				break;
 			default:
-				/* pass through */
-				break;
+				throw decode_error("Unknown character entity");
 			}
+			uint8_t buffer[4];
+			size_t len = encode_utf8(c, buffer);
+			str.append((char *) buffer, len);
+		} else {
+			/* assume input is UTF-8 and pass through unmodified */
+			str += char(c);
 		}
-		str += char(c);
 	}
 	return str;
 }
