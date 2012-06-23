@@ -33,6 +33,8 @@ void verify_error(const char *s, const char *error)
 
 int main()
 {
+	const uint8_t snowman[] = {0xE2, 0x98, 0x83, 0};
+
 	verify(1234, "1234");
 	verify(-1234, "-1234");
 	verify(1234, "1234.");
@@ -41,6 +43,7 @@ int main()
 	verify(-1234.56, "-1234.56");
 	verify(1234, "\t1234 \n");
 	verify(std::string("foobar"), "\"foobar\"");
+	verify("snow" + std::string((char *) snowman) + "man", "\"snow\u2603man\"");
 	verify(std::string(""), "\"\"");
 	verify(std::string(" /\r\n \"\\"), "\" \\/\\r\\n \\\"\\\\\" ");
 	verify(true, "true");
