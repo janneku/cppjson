@@ -517,6 +517,9 @@ void Value::write(std::ostream &os) const
 	case JSON_BOOLEAN:
 		os << (m_value.boolean ? "true" : "false");
 		break;
+	case JSON_NULL:
+		os << "null";
+		break;
 	default:
 		assert(0);
 	}
