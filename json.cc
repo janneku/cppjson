@@ -233,8 +233,19 @@ bool Value::operator != (const Value &other) const
 void skip_space(std::istream &is)
 {
 	int c = is.peek();
-	while (!is.eof() && isspace(c)) {
-		is.get();
+	while (!is.eof()) {
+		/* Skip over C++-style comments */
+		if (c == '/') {
+			is.get();
+			if (is.get() != '/') {
+				throw decode_error("Expected '/'");
+			}
+			while (is.peek() != '\n' && !is.eof())
+				is.get();
+		} else if (!isspace(c))
+			break;
+		else
+			is.get();
 		c = is.peek();
 	}
 }

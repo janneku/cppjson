@@ -38,6 +38,9 @@ int main()
 	verify(1234, "1234");
 	verify(-1234, "-1234");
 	verify(1234, "1234.");
+	verify(1234, "1234 // a comment\n\n");
+	verify(1234, "//a comment\n\n1234");
+	verify(1234, "//\n1234");
 	verify(1234.0, "1234");
 	verify(1234.56, "1234.56");
 	verify(-1234.56, "-1234.56");
@@ -77,6 +80,7 @@ int main()
 	verify_error("{\"a\": [] ", "Expected ',' or '}'");
 	verify_error("{\"a\" 5 ", "Expected ':'");
 	verify_error("11111111111111111111", "Invalid integer");
+	verify_error(" /", "Expected '/'");
 
 	printf("ok\n");
 	return 0;
