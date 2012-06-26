@@ -63,8 +63,8 @@ int main()
 
 	json::object_map_t obj;
 	verify(obj, "{}");
-	obj.insert(std::make_pair("bar", arr));
-	obj.insert(std::make_pair("foo", std::string("test")));
+	obj["bar"] = arr;
+	obj["foo"] = std::string("test");
 	verify(obj, "{\"bar\" :[ \"foo\" ,1234,-1234.56, true, ], \"foo\": \"test\"}\n");
 
 	verify_error("foobar", "Unknown keyword in input");
