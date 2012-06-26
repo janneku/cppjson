@@ -229,6 +229,16 @@ bool Value::operator != (const Value &other) const
 	return !(*this == other);
 }
 
+/* Skips over all spaces in the input. The stream can end up in EOF state. */
+void skip_space(std::istream &is)
+{
+	int c = is.peek();
+	while (!is.eof() && isspace(c)) {
+		is.get();
+		c = is.peek();
+	}
+}
+
 std::string load_string(std::istream &is)
 {
 	int c = is.get();
@@ -321,45 +331,39 @@ void write_string(std::ostream &os, const std::string &str)
 void Value::load(std::istream &is)
 {
 	destroy();
-	int c = is.peek();
-	while (!is.eof() && isspace(c)) {
-		is.get();
-		c = is.peek();
-	}
+
+	/*
+	 * Note, we take adventage of the fact that when EOF is reached,
+	 * peek() and get() returns a special value that doesn't match
+	 * anything else.
+	 */
+	skip_space(is);
 	if (is.eof()) {
 		throw decode_error("Unexpected end of input");
 	}
+	int c = is.peek();
 	switch (c) {
 	case '{':
 		is.get();
 		m_type = JSON_OBJECT;
 		m_value.object = new object_map_t;
 		while (1) {
-			c = is.peek();
-			while (!is.eof() && isspace(c)) {
-				is.get();
-				c = is.peek();
-			}
-			if (c == '}') {
+			skip_space(is);
+			if (is.peek() == '}') {
 				is.get();
 				break;
 			}
 			std::string key = load_string(is);
-			c = is.get();
-			while (!is.eof() && isspace(c)) {
-				c = is.get();
-			}
-			if (c != ':') {
+			skip_space(is);
+			if (is.get() != ':') {
 				throw decode_error("Expected ':'");
 			}
 			Value val;
 			val.load(is);
 			m_value.object->insert(std::make_pair(key, val));
 
+			skip_space(is);
 			c = is.get();
-			while (!is.eof() && isspace(c)) {
-				c = is.get();
-			}
 			if (c == '}') {
 				break;
 			} else if (c != ',') {
@@ -373,12 +377,8 @@ void Value::load(std::istream &is)
 		m_type = JSON_ARRAY;
 		m_value.array = new std::vector<Value>;
 		while (1) {
-			c = is.peek();
-			while (!is.eof() && isspace(c)) {
-				is.get();
-				c = is.peek();
-			}
-			if (c == ']') {
+			skip_space(is);
+			if (is.peek() == ']') {
 				is.get();
 				break;
 			}
@@ -386,10 +386,8 @@ void Value::load(std::istream &is)
 			val.load(is);
 			m_value.array->push_back(val);
 
+			skip_space(is);
 			c = is.get();
-			while (!is.eof() && isspace(c)) {
-				c = is.get();
-			}
 			if (c == ']') {
 				break;
 			} else if (c != ',') {
@@ -472,11 +470,7 @@ void Value::load(std::istream &is)
 void Value::load_all(std::istream &is)
 {
 	load(is);
-	int c = is.peek();
-	while (!is.eof() && isspace(c)) {
-		is.get();
-		c = is.peek();
-	}
+	skip_space(is);
 	if (!is.eof()) {
 		throw decode_error("Left over data in input");
 	}
