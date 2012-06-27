@@ -87,6 +87,12 @@ Value::Value(const std::string &s) :
 	m_value.string = new std::string(s);
 }
 
+Value::Value(const char *s) :
+	m_type(JSON_STRING)
+{
+	m_value.string = new std::string(s);
+}
+
 Value::Value(int i) :
 	m_type(JSON_INTEGER)
 {

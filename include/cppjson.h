@@ -51,6 +51,7 @@ class Value {
 public:
 	Value(Type type = JSON_NULL);
 	Value(const std::string &s);
+	Value(const char *s);
 	Value(int i);
 	Value(double d);
 	Value(bool b);

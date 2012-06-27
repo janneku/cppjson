@@ -45,17 +45,17 @@ int main()
 	verify(1234.56, "1234.56");
 	verify(-1234.56, "-1234.56");
 	verify(1234, "\t1234 \n");
-	verify(std::string("foobar"), "\"foobar\"");
+	verify("foobar", "\"foobar\"");
 	verify("snow" + std::string((char *) snowman) + "man", "\"snow\u2603man\"");
-	verify(std::string(""), "\"\"");
-	verify(std::string(" /\r\n \"\\"), "\" \\/\\r\\n \\\"\\\\\" ");
+	verify("", "\"\"");
+	verify(" /\r\n \"\\", "\" \\/\\r\\n \\\"\\\\\" ");
 	verify(true, "true");
 	verify(false, "false");
 
 	std::vector<json::Value> arr;
 	verify(arr, "[] ");
 
-	arr.push_back(std::string("foo"));
+	arr.push_back("foo");
 	arr.push_back(1234);
 	arr.push_back(-1234.56);
 	arr.push_back(true);
@@ -64,7 +64,7 @@ int main()
 	json::object_map_t obj;
 	verify(obj, "{}");
 	obj["bar"] = arr;
-	obj["foo"] = std::string("test");
+	obj["foo"] = "test";
 	verify(obj, "{\"bar\" :[ \"foo\" ,1234,-1234.56, true, ], \"foo\": \"test\"}\n");
 
 	verify_error("foobar", "Unknown keyword in input");
