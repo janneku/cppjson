@@ -124,13 +124,23 @@ public:
 		return *m_value.array;
 	}
 
-	Value get(const std::string &s) const
+	const Value &get(const std::string &s) const
 	{
+		static Value null;
 		verify_type(JSON_OBJECT);
-		object_map_t::const_iterator i = m_value.object->find(s);
+		object_map_t::iterator i = m_value.object->find(s);
 		if (i == m_value.object->end()) {
-			/* return null */
-			return Value();
+			return null;
+		}
+		return i->second;
+	}
+	Value &get(const std::string &s)
+	{
+		static Value null;
+		verify_type(JSON_OBJECT);
+		object_map_t::iterator i = m_value.object->find(s);
+		if (i == m_value.object->end()) {
+			return null;
 		}
 		return i->second;
 	}
