@@ -165,6 +165,8 @@ void Value::verify_type(Type expected) const
 
 void Value::operator = (const Value &from)
 {
+	if (this == &from)
+		return;
 	destroy();
 	m_type = from.m_type;
 	switch (m_type) {
