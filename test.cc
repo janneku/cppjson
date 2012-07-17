@@ -13,9 +13,15 @@ void verify(const json::Value &value, const char *encoded)
 	assert(value == value2);
 
 	/* try to load the JSON string, and check that it is equal */
-	std::istringstream parser2(encoded);
-	value2.load_all(parser2);
+	parser.str(encoded);
+	parser.clear();
+	value2.load_all(parser);
 	assert(value == value2);
+
+	/* Verify lazy loading */
+	parser.str(encoded);
+	parser.clear();
+	value2.load_all(parser, true);
 }
 
 void verify_error(const char *s, const char *error)
