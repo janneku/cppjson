@@ -201,6 +201,9 @@ void Value::operator = (const Value &from)
 	case JSON_BOOLEAN:
 		m_value.boolean = from.m_value.boolean;
 		break;
+	case JSON_LAZY_ARRAY:
+		m_value.lazy = new LazyArray(*from.m_value.lazy);
+		break;
 	default:
 		assert(0);
 	}
