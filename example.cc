@@ -9,6 +9,7 @@
  */
 #include "cppjson.h"
 #include <sstream>
+#include <iostream>
 #include <curl/curl.h>
 #include <curl/easy.h>
 
@@ -46,14 +47,18 @@ try {
 		throw std::runtime_error(error);
 	}
 
+	/* We use lazy loading here to allow very large inputs */
 	json::Value doc;
 	std::istringstream parser(result);
-	doc.load(parser);
+	doc.load(parser, true);
 
-	FOR_EACH_CONST(std::vector<json::Value>, i, doc.as_array()) {
-		std::string created = i->get("created_at").as_string();
-		std::string text = i->get("text").as_string();
-		printf("<%s> %s\n", created.c_str(), text.c_str());
+	bool end = false;
+	for (json::Value i = doc.load_next(&end); !end; i = doc.load_next(&end)) {
+		json::Value user = i.get("user");
+		std::string from = user.get("screen_name").as_string();
+		std::string created = i.get("created_at").as_string();
+		std::string text = i.get("text").as_string();
+		printf("<%s> %s: %s\n", created.c_str(), from.c_str(), text.c_str());
 	}
 	return 0;
 
