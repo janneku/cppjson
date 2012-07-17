@@ -91,6 +91,11 @@ int main()
 	obj["foo"] = "test";
 	verify(obj, "{\"bar\" :[ \"foo\" ,1234,-1234.56, true, ], \"foo\": \"test\"}\n");
 
+	std::vector<json::Value> arr2;
+	arr2.push_back(obj);
+	arr2.push_back(123);
+	verify(arr2, "[{\"bar\":[\"foo\",1234 ,-1234.56,true],\"foo\":\"test\"} ,123\n]");
+
 	verify_error("foobar", "Unknown keyword in input");
 	verify_error("-foo", "Expected a digit");
 	verify_error("trueorfalse", "Unknown keyword in input");
