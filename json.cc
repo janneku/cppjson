@@ -358,6 +358,74 @@ void write_string(std::ostream &os, const std::string &str)
 	os.put('"');
 }
 
+/* Quickly skips a single value (with less validation) */
+void skip_value(std::istream &is)
+{
+	int depth = 0;
+
+	do {
+		skip_space(is);
+		if (is.eof()) {
+			throw decode_error("Unexpected end of input");
+		}
+		int c = is.peek();
+		switch (c) {
+		case '{':
+		case '[':
+			is.get();
+			depth++;
+			break;
+
+		case '}':
+		case ']':
+			is.get();
+			if (depth == 0) {
+				throw decode_error("Unpaired ']' or '}'");
+			}
+			depth--;
+			break;
+
+		case ':':
+		case ',':
+			is.get();
+			break;
+
+		case '"':
+			load_string(is);
+			break;
+
+		default:
+			if ((c >= '0' && c <= '9') || c == '-') {
+				/* Skip over a number */
+				if (c == '-') {
+					is.get();
+					c = is.peek();
+				}
+				while (!is.eof() && isdigit(c)) {
+					is.get();
+					c = is.peek();
+				}
+				if (c == '.') {
+					is.get();
+					c = is.peek();
+					while (!is.eof() && isdigit(c)) {
+						is.get();
+						c = is.peek();
+					}
+				}
+			} else if (isalpha(c)) {
+				/* Skip over a word */
+				while (!is.eof() && isalpha(c)) {
+					is.get();
+					c = is.peek();
+				}
+			} else {
+				throw decode_error("Unknown character in input");
+			}
+		}
+	} while (depth > 0);
+}
+
 Value Value::load_next(bool *end, bool lazy)
 {
 	verify_type(JSON_LAZY_ARRAY);
@@ -384,7 +452,6 @@ Value Value::load_next(bool *end, bool lazy)
 		if (c == ',') {
 			is->get();
 		} else if (c != ']') {
-			/* Shouldn't really happen, but... */
 			throw decode_error("Expected ',' or ']'");
 		}
 	}
@@ -461,9 +528,7 @@ void Value::load(std::istream &is, bool lazy)
 				break;
 			}
 			if (lazy) {
-				/* Throw the value away */
-				Value val;
-				val.load(is, true);
+				skip_value(is);
 			} else {
 				m_value.array->push_back(Value());
 				m_value.array->back().load(is, lazy);
