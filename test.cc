@@ -33,13 +33,19 @@ void verify_error(const char *s, const char *error)
 
 void test_lazy_array()
 {
-	std::istringstream parser("[1, \"foo\"]");
+	std::istringstream parser("{\"a\": [1, \"foo\"], \"b\": [2, \"bar\"]}");
 	json::Value value;
 	value.load_all(parser, true);
-	assert(value.load_next().as_integer() == 1);
-	assert(value.load_next().as_string() == "foo");
+	json::Value &a = value.get("a");
+	json::Value &b = value.get("b");
+	assert(a.load_next().as_integer() == 1);
+	assert(b.load_next().as_integer() == 2);
+	assert(a.load_next().as_string() == "foo");
 	bool end = false;
-	value.load_next(&end);
+	a.load_next(&end);
+	assert(end);
+	assert(b.load_next().as_string() == "bar");
+	b.load_next(&end);
 	assert(end);
 }
 
