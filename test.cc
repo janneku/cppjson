@@ -31,6 +31,18 @@ void verify_error(const char *s, const char *error)
 	}
 }
 
+void test_lazy_array()
+{
+	std::istringstream parser("[1, \"foo\"]");
+	json::Value value;
+	value.load_all(parser, true);
+	assert(value.load_next().as_integer() == 1);
+	assert(value.load_next().as_string() == "foo");
+	bool end = false;
+	value.load_next(&end);
+	assert(end);
+}
+
 int main()
 {
 	const uint8_t snowman[] = {0xE2, 0x98, 0x83, 0};
@@ -81,6 +93,8 @@ int main()
 	verify_error("{\"a\" 5 ", "Expected ':'");
 	verify_error("11111111111111111111", "Invalid integer");
 	verify_error(" /", "Expected '/'");
+
+	test_lazy_array();
 
 	printf("ok\n");
 	return 0;

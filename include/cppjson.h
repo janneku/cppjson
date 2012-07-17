@@ -42,7 +42,10 @@ enum Type {
 	JSON_BOOLEAN,
 	JSON_OBJECT,
 	JSON_ARRAY,
+	JSON_LAZY_ARRAY,
 };
+
+struct LazyArray;
 
 class Value;
 typedef std::map<std::string, Value> object_map_t;
@@ -124,6 +127,9 @@ public:
 		return *m_value.array;
 	}
 
+	/* Used to iterate lazy-loaded arrays */
+	Value load_next(bool *eof = NULL, bool lazy = false);
+
 	const Value &get(const std::string &s) const
 	{
 		static Value null;
@@ -161,8 +167,8 @@ public:
 	bool operator == (const Value &other) const;
 	bool operator != (const Value &other) const;
 
-	void load(std::istream &is);
-	void load_all(std::istream &is);
+	void load(std::istream &is, bool lazy = false);
+	void load_all(std::istream &is, bool lazy = false);
 
 	void write(std::ostream &os, int indent=0) const;
 
@@ -175,6 +181,7 @@ private:
 		bool boolean;
 		object_map_t *object;
 		std::vector<Value> *array;
+		LazyArray *lazy;
 	} m_value;
 
 	void destroy();

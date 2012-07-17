@@ -16,6 +16,11 @@
 
 namespace json {
 
+struct LazyArray {
+	std::istream *is;
+	size_t offset;
+};
+
 /* Format a string, similar to sprintf() */
 const std::string strf(const char *fmt, ...)
 {
@@ -61,6 +66,7 @@ static const char *type_names[] = {
 	"boolean",
 	"object",
 	"array",
+	"lazy array",
 };
 
 Value::Value(Type type) :
@@ -146,11 +152,16 @@ void Value::destroy()
 	case JSON_ARRAY:
 		delete m_value.array;
 		break;
+	case JSON_LAZY_ARRAY:
+		delete m_value.lazy;
+		break;
 	case JSON_NULL:
 	case JSON_BOOLEAN:
 	case JSON_INTEGER:
 	case JSON_FLOATING:
 		break;
+	default:
+		assert(0);
 	}
 	m_type = JSON_NULL;
 }
@@ -347,7 +358,41 @@ void write_string(std::ostream &os, const std::string &str)
 	os.put('"');
 }
 
-void Value::load(std::istream &is)
+Value Value::load_next(bool *end, bool lazy)
+{
+	verify_type(JSON_LAZY_ARRAY);
+
+	std::istream *is = m_value.lazy->is;
+	is->seekg(m_value.lazy->offset);
+
+	Value val;
+
+	skip_space(*is);
+	if (is->peek() == ']') {
+		/* End of the list, return null */
+		if (end != NULL) {
+			*end = true;
+		}
+	} else {
+		if (end != NULL) {
+			*end = false;
+		}
+		val.load(*is, lazy);
+
+		skip_space(*is);
+		int c = is->peek();
+		if (c == ',') {
+			is->get();
+		} else if (c != ']') {
+			/* Shouldn't really happen, but... */
+			throw decode_error("Expected ',' or ']'");
+		}
+	}
+	m_value.lazy->offset = is->tellg();
+	return val;
+}
+
+void Value::load(std::istream &is, bool lazy)
 {
 	destroy();
 
@@ -386,13 +431,13 @@ void Value::load(std::istream &is)
 			if (!res.second) {
 				throw decode_error("Duplicate key in object");
 			}
-			res.first->second.load(is);
+			res.first->second.load(is, lazy);
 
 			skip_space(is);
-			c = is.get();
-			if (c == '}') {
-				break;
-			} else if (c != ',') {
+			c = is.peek();
+			if (c == ',') {
+				is.get();
+			} else if (c != '}') {
 				throw decode_error("Expected ',' or '}'");
 			}
 		}
@@ -400,22 +445,35 @@ void Value::load(std::istream &is)
 
 	case '[':
 		is.get();
-		m_type = JSON_ARRAY;
-		m_value.array = new std::vector<Value>;
+		if (lazy) {
+			m_type = JSON_LAZY_ARRAY;
+			m_value.lazy = new LazyArray;
+			m_value.lazy->is = &is;
+			m_value.lazy->offset = is.tellg();
+		} else {
+			m_type = JSON_ARRAY;
+			m_value.array = new std::vector<Value>;
+		}
 		while (1) {
 			skip_space(is);
 			if (is.peek() == ']') {
 				is.get();
 				break;
 			}
-			m_value.array->push_back(Value());
-			m_value.array->back().load(is);
+			if (lazy) {
+				/* Throw the value away */
+				Value val;
+				val.load(is, true);
+			} else {
+				m_value.array->push_back(Value());
+				m_value.array->back().load(is, lazy);
+			}
 
 			skip_space(is);
-			c = is.get();
-			if (c == ']') {
-				break;
-			} else if (c != ',') {
+			c = is.peek();
+			if (c == ',') {
+				is.get();
+			} else if (c != ']') {
 				throw decode_error("Expected ',' or ']'");
 			}
 		}
@@ -492,9 +550,9 @@ void Value::load(std::istream &is)
 	}
 }
 
-void Value::load_all(std::istream &is)
+void Value::load_all(std::istream &is, bool lazy)
 {
-	load(is);
+	load(is, lazy);
 	skip_space(is);
 	if (!is.eof()) {
 		throw decode_error("Left over data in input");
