@@ -254,21 +254,22 @@ bool Value::operator != (const Value &other) const
 /* Skips over all spaces in the input. The stream can end up in EOF state. */
 void skip_space(std::istream &is)
 {
-	int c = is.peek();
-	while (!is.eof()) {
-		/* Skip over C++-style comments */
+	while (1) {
+		int c = is.peek();
+		while (!is.eof() && isspace(c)) {
+			is.get();
+			c = is.peek();
+		}
 		if (c == '/') {
+			/* Skip over C++-style comments */
 			is.get();
 			if (is.get() != '/') {
 				throw decode_error("Expected '/'");
 			}
 			while (is.peek() != '\n' && !is.eof())
 				is.get();
-		} else if (!isspace(c))
+		} else
 			break;
-		else
-			is.get();
-		c = is.peek();
 	}
 }
 
@@ -282,13 +283,11 @@ std::string load_string(std::istream &is)
 		throw decode_error("Expected a string");
 	}
 	std::string str;
-	while (1) {
-		c = is.get();
+	c = is.get();
+	while (c != '"') {
 		if (is.eof()) {
 			throw decode_error("Unexpected end of input");
 		}
-		if (c == '"')
-			break;
 		if (c == '\\') {
 			c = is.get();
 			if (is.eof()) {
@@ -331,6 +330,7 @@ std::string load_string(std::istream &is)
 			/* assume input is UTF-8 and pass through unmodified */
 			str += char(c);
 		}
+		c = is.get();
 	}
 	return str;
 }
@@ -404,14 +404,14 @@ void skip_value(std::istream &is)
 					is.get();
 					c = is.peek();
 				}
-				while (!is.eof() && isdigit(c)) {
+				while (!is.eof() && c >= '0' && c <= '9') {
 					is.get();
 					c = is.peek();
 				}
 				if (c == '.') {
 					is.get();
 					c = is.peek();
-					while (!is.eof() && isdigit(c)) {
+					while (!is.eof() && c >= '0' && c <= '9') {
 						is.get();
 						c = is.peek();
 					}
@@ -481,12 +481,8 @@ void Value::load(std::istream &is, bool lazy)
 		is.get();
 		m_type = JSON_OBJECT;
 		m_value.object = new object_map_t;
-		while (1) {
-			skip_space(is);
-			if (is.peek() == '}') {
-				is.get();
-				break;
-			}
+		skip_space(is);
+		while (is.peek() != '}') {
 			std::string key = load_string(is);
 			skip_space(is);
 			if (is.get() != ':') {
@@ -507,10 +503,12 @@ void Value::load(std::istream &is, bool lazy)
 			c = is.peek();
 			if (c == ',') {
 				is.get();
+				skip_space(is);
 			} else if (c != '}') {
 				throw decode_error("Expected ',' or '}'");
 			}
 		}
+		is.get();
 		break;
 
 	case '[':
@@ -524,12 +522,8 @@ void Value::load(std::istream &is, bool lazy)
 			m_type = JSON_ARRAY;
 			m_value.array = new std::vector<Value>;
 		}
-		while (1) {
-			skip_space(is);
-			if (is.peek() == ']') {
-				is.get();
-				break;
-			}
+		skip_space(is);
+		while (is.peek() != ']') {
 			if (lazy) {
 				skip_value(is);
 			} else {
@@ -541,10 +535,12 @@ void Value::load(std::istream &is, bool lazy)
 			c = is.peek();
 			if (c == ',') {
 				is.get();
+				skip_space(is);
 			} else if (c != ']') {
 				throw decode_error("Expected ',' or ']'");
 			}
 		}
+		is.get();
 		break;
 
 	case '"':
@@ -566,7 +562,7 @@ void Value::load(std::istream &is, bool lazy)
 					throw decode_error("Expected a digit");
 				}
 			}
-			while (!is.eof() && isdigit(c)) {
+			while (!is.eof() && c >= '0' && c <= '9') {
 				str += char(c);
 				is.get();
 				c = is.peek();
@@ -575,7 +571,7 @@ void Value::load(std::istream &is, bool lazy)
 				str += char(c);
 				is.get();
 				c = is.peek();
-				while (!is.eof() && isdigit(c)) {
+				while (!is.eof() && c >= '0' && c <= '9') {
 					str += char(c);
 					is.get();
 					c = is.peek();
