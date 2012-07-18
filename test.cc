@@ -70,7 +70,7 @@ int main()
 	verify(-1234.56, "-1234.56");
 	verify(1234, "\t1234 \n");
 	verify("foobar", "\"foobar\"");
-	verify("snow" + std::string((char *) snowman) + "man", "\"snow\u2603man\"");
+	verify("snow" + std::string((char *) snowman) + "man", "\"snow\\u2603man\"");
 	verify("", "\"\"");
 	verify(" /\r\n \"\\", "\" \\/\\r\\n \\\"\\\\\" ");
 	verify(true, "true");
