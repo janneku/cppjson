@@ -327,6 +327,10 @@ std::string load_string(std::istream &is)
 					if (!parser) {
 						throw decode_error("Invalid unicode");
 					}
+					parser.get();
+					if (!parser.eof()) {
+						throw decode_error("Invalid unicode");
+					}
 				}
 				break;
 			default:
