@@ -110,6 +110,26 @@ int main()
 	verify_error("11111111111111111111", "Invalid integer");
 	verify_error(" /", "Expected '/'");
 
+	try {
+		json::Value val;
+		std::istringstream ss("{\"bar\": 123}");
+		val.load_all(ss);
+		int i = val.get("foo").as_integer();
+		(void) i;
+	} catch (const json::type_error &e) {
+		assert(e.what() == std::string("Expected type integer, but got null"));
+	}
+
+	try {
+		json::Value val;
+		std::istringstream ss("{\"bar\": 123, \"foo\": true}");
+		val.load_all(ss);
+		int i = val.get("foo").as_integer();
+		(void) i;
+	} catch (const json::type_error &e) {
+		assert(e.what() == std::string("Expected type integer, but got boolean"));
+	}
+
 	test_lazy_array();
 
 	printf("ok\n");
