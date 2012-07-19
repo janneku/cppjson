@@ -388,12 +388,12 @@ void write_string(std::ostream &os, const std::string &str)
 	os.put('"');
 }
 
-/* Quickly skips a single value (with less validation) */
-void skip_value(std::istream &is)
+/* Quickly skips an array (with less validation) */
+void skip_array(std::istream &is)
 {
-	int depth = 0;
+	int depth = 1;
 
-	do {
+	while (depth > 0) {
 		skip_space(is);
 		if (is.eof()) {
 			throw decode_error("Unexpected end of input");
@@ -453,7 +453,7 @@ void skip_value(std::istream &is)
 				throw decode_error("Unknown character in input");
 			}
 		}
-	} while (depth > 0);
+	}
 }
 
 Value Value::load_next(bool *end, bool lazy)
@@ -545,29 +545,26 @@ void Value::load(std::istream &is, bool lazy)
 			m_value.lazy = new LazyArray;
 			m_value.lazy->is = &is;
 			m_value.lazy->offset = is.tellg();
+			skip_array(is);
 		} else {
 			m_type = JSON_ARRAY;
 			m_value.array = new std::vector<Value>;
-		}
-		skip_space(is);
-		while (is.peek() != ']') {
-			if (lazy) {
-				skip_value(is);
-			} else {
+			skip_space(is);
+			while (is.peek() != ']') {
 				m_value.array->push_back(Value());
 				m_value.array->back().load(is, lazy);
-			}
 
-			skip_space(is);
-			c = is.peek();
-			if (c == ',') {
-				is.get();
 				skip_space(is);
-			} else if (c != ']') {
-				throw decode_error("Expected ',' or ']'");
+				c = is.peek();
+				if (c == ',') {
+					is.get();
+					skip_space(is);
+				} else if (c != ']') {
+					throw decode_error("Expected ',' or ']'");
+				}
 			}
+			is.get();
 		}
-		is.get();
 		break;
 
 	case '"':
