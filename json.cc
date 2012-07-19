@@ -326,6 +326,8 @@ std::string load_string(std::istream &is)
 			uint8_t buffer[4];
 			size_t len = encode_utf8(c, buffer);
 			str.append((char *) buffer, len);
+		} else if (c >= 0 && c <= 0x1F) {
+			 throw decode_error("Control character in a string");
 		} else {
 			/* assume input is UTF-8 and pass through unmodified */
 			str += char(c);

@@ -108,6 +108,7 @@ int main()
 	verify_error("{1234.56}", "Expected a string");
 	verify_error("{\"a\": [] ", "Expected ',' or '}'");
 	verify_error("{\"a\" 5 ", "Expected ':'");
+	verify_error("\"foo\nbar\"", "Control character in a string");
 	verify_error("11111111111111111111", "Invalid integer");
 	verify_error(" /", "Expected '/'");
 
