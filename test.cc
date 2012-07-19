@@ -57,58 +57,85 @@ void test_lazy_array()
 
 int main()
 {
+	/* Test basic types */
 	verify(1234, "1234");
 	verify(-1234, "-1234");
 	verify(1234, "1234.");
-	verify(1234, "1234 // a comment\n\n");
-	verify(1234, "//a comment\n\n1234");
-	verify(1234, "//\n1234");
-	verify(1234.0, "1234");
 	verify(1234.56, "1234.56");
 	verify(-1234.56, "-1234.56");
-	verify(1234, "\t1234 \n");
-	verify("foobar", "\"foobar\"");
-	verify("snow\xE2\x98\x83man", "\"snow\\u2603man\"");
 	verify("", "\"\"");
-	verify(" /\rtest\n\t\f\btest \"\\", "\" \\/\\rtest\\n\\t\\f\\btest \\\"\\\\\" ");
+	verify("foobar", "\"foobar\"");
 	verify(true, "true");
 	verify(false, "false");
+	verify(json::Value(), "null");
+	verify(json::object_map_t(), "{}");
+	verify(std::vector<json::Value>(), "[]");
+	verify(1234, "\t1234");
+	verify(1234, "1234\n");
 
+	/* Floating points and integers should be treated as the same */
+	verify(1234.0, "1234");
+	verify(1234, "1234.0");
+
+	/* Test that unicode is converted to UTF-8 */
+	verify("snow\xE2\x98\x83man", "\"snow\\u2603man\"");
+
+	verify("\r\n\t\f\b", "\"\\r\\n\\t\\f\\b\"");
+	verify("foo\nbar ", "\"foo\\nbar \"");
+
+	/* Test comments */
+	verify(1234, "1234// a comment");
+	verify(1234, "1234// \"foobar\"");
+	verify(1234, "1234\n// a comment");
+	verify(1234, "//acomment {}[]\n\n1234");
+	verify(1234, "//\n1234");
+	verify_error(" /", "Expected '/'");
+	verify_error(" /x", "Expected '/'");
+
+	/* Test arrays */
 	std::vector<json::Value> arr;
-	verify(arr, "[] ");
-
 	arr.push_back("foo");
 	arr.push_back(1234);
 	arr.push_back(-1234.56);
 	arr.push_back(true);
-	verify(arr, "[\"foo\",\n 1234,\t-1234.56\n, true] ");
-
-	json::object_map_t obj;
-	verify(obj, "{}");
-	obj["bar"] = arr;
-	obj["foo"] = "test";
-	verify(obj, "{\"bar\" :[ \"foo\" ,1234,-1234.56, true, ], \"foo\": \"test\"}\n");
-
-	std::vector<json::Value> arr2;
-	arr2.push_back(obj);
-	arr2.push_back(123);
-	verify(arr2, "[{\"bar\":[\"foo\",1234 ,-1234.56,true],\"foo\":\"test\"} ,123\n]");
-
-	verify_error("foobar", "Unknown keyword in input");
-	verify_error("-foo", "Expected a digit");
-	verify_error("trueorfalse", "Unknown keyword in input");
-	verify_error("\"foobar", "Unexpected end of input");
+	verify(arr, "[\"foo\", 1234, -1234.56, true]");
+	verify(arr, "[\"foo\", 1234, -1234.56, true,]");
+	verify(arr, " [ \"foo\" ,1234,\n-1234.56,\ttrue ]");
 	verify_error("[,] ", "Unknown character in input");
 	verify_error("[1234, ", "Unexpected end of input");
 	verify_error(" [1 2]", "Expected ',' or ']'");
+
+	/* Test objects */
+	json::object_map_t obj;
+	obj["bar"] = arr;
+	obj["foo"] = "test";
+	verify(obj, "{\"bar\": [\"foo\",1234,-1234.56,true], \"foo\": \"test\"}");
+	verify(obj, "{\n\"bar\" :[ \"foo\" ,1234,-1234.56, true, ], \t\"foo\"\n: \"test\"\n,}");
 	verify_error("{\"foo\": ,} ", "Unknown character in input");
 	verify_error("{ \"foo\": 1234, ", "Unexpected end of input");
 	verify_error("{1234.56}", "Expected a string");
 	verify_error("{\"a\": [] ", "Expected ',' or '}'");
 	verify_error("{\"a\" 5 ", "Expected ':'");
+
+	/* A list that contains an object */
+	std::vector<json::Value> arr2;
+	arr2.push_back(obj);
+	arr2.push_back(123);
+	verify(arr2, "[{\"bar\": [\"foo\", 1234, -1234.56, true], \"foo\": \"test\"}, 123]");
+	verify(arr2, "[{\"bar\":[\"foo\",1234 ,-1234.56,true],\"foo\":\"test\"} ,123\n, ]");
+
+	verify_error("foobar", "Unknown keyword in input");
+	verify_error("-foo", "Expected a digit");
+	verify_error("trueorfalse", "Unknown keyword in input");
+	verify_error("\"foobar", "Unexpected end of input");
+	verify_error("\"foo\\xbar\"", "Unknown character entity");
+	verify_error("\"foo\\", "Unexpected end of input");
+	verify_error("\"foo\\u12", "Unexpected end of input");
+	verify_error("\"foo\\ubarz\"", "Invalid unicode");
+	verify_error("? ", "Unknown character in input");
+	verify_error("\"foo\nbar\"", "Control character in a string");
 	verify_error("\"foo\nbar\"", "Control character in a string");
 	verify_error("11111111111111111111", "Invalid integer");
-	verify_error(" /", "Expected '/'");
 
 	try {
 		json::Value val;
