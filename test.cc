@@ -57,8 +57,6 @@ void test_lazy_array()
 
 int main()
 {
-	const uint8_t snowman[] = {0xE2, 0x98, 0x83, 0};
-
 	verify(1234, "1234");
 	verify(-1234, "-1234");
 	verify(1234, "1234.");
@@ -70,9 +68,9 @@ int main()
 	verify(-1234.56, "-1234.56");
 	verify(1234, "\t1234 \n");
 	verify("foobar", "\"foobar\"");
-	verify("snow" + std::string((char *) snowman) + "man", "\"snow\\u2603man\"");
+	verify("snow\xE2\x98\x83man", "\"snow\\u2603man\"");
 	verify("", "\"\"");
-	verify(" /\r\n \"\\", "\" \\/\\r\\n \\\"\\\\\" ");
+	verify(" /\rtest\n\t\f\btest \"\\", "\" \\/\\rtest\\n\\t\\f\\btest \\\"\\\\\" ");
 	verify(true, "true");
 	verify(false, "false");
 

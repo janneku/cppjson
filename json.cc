@@ -300,6 +300,15 @@ std::string load_string(std::istream &is)
 			case 'r':
 				c = '\r';
 				break;
+			case 't':
+				c = '\t';
+				break;
+			case 'f':
+				c = '\f';
+				break;
+			case 'b':
+				c = '\b';
+				break;
 			case '\\':
 			case '/':
 			case '"':
@@ -350,6 +359,18 @@ void write_string(std::ostream &os, const std::string &str)
 		case '\r':
 			os.put('\\');
 			c = 'r';
+			break;
+		case '\t':
+			os.put('\\');
+			c = 't';
+			break;
+		case '\f':
+			os.put('\\');
+			c = 'f';
+			break;
+		case '\b':
+			os.put('\\');
+			c = 'b';
 			break;
 		case '"':
 		case '\\':
