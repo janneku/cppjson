@@ -8,6 +8,7 @@
 #include "cppjson.h"
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <sstream>
 
@@ -388,10 +389,28 @@ void write_string(std::ostream &os, const std::string &str)
 	os.put('"');
 }
 
+void match(std::istream &is, const char *word, size_t len)
+{
+	char buf[10];
+	is.read(buf, len);
+	if (is.eof()) {
+		throw decode_error("Unexpected end of input");
+	}
+	if (memcmp(buf, word, len) != 0) {
+		throw decode_error("Unknown keyword in input");
+	}
+
+	int c = is.peek();
+	if (!is.eof() && (c >= 'a' && c <= 'z')) {
+		throw decode_error("Unknown keyword in input");
+	}
+}
+
 /* Quickly skips an array (with less validation) */
 void skip_array(std::istream &is)
 {
 	int depth = 1;
+	char dummy[10];
 
 	while (depth > 0) {
 		skip_space(is);
@@ -424,6 +443,30 @@ void skip_array(std::istream &is)
 			load_string(is);
 			break;
 
+		case 't':
+			/* true */
+			is.read(dummy, 4);
+			if (is.eof()) {
+				throw decode_error("Unexpected end of input");
+			}
+			break;
+
+		case 'f':
+			/* false */
+			is.read(dummy, 5);
+			if (is.eof()) {
+				throw decode_error("Unexpected end of input");
+			}
+			break;
+
+		case 'n':
+			/* null */
+			is.read(dummy, 4);
+			if (is.eof()) {
+				throw decode_error("Unexpected end of input");
+			}
+			break;
+
 		default:
 			if ((c >= '0' && c <= '9') || c == '-') {
 				/* Skip over a number */
@@ -442,12 +485,6 @@ void skip_array(std::istream &is)
 						is.get();
 						c = is.peek();
 					}
-				}
-			} else if (isalpha(c)) {
-				/* Skip over a word */
-				while (!is.eof() && isalpha(c)) {
-					is.get();
-					c = is.peek();
 				}
 			} else {
 				throw decode_error("Unknown character in input");
@@ -571,6 +608,24 @@ void Value::load(std::istream &is, bool lazy)
 		m_value.string = new std::string(load_string(is));
 		m_type = JSON_STRING;
 		break;
+
+	case 't':
+		match(is, "true", 4);
+		m_type = JSON_BOOLEAN;
+		m_value.boolean = true;
+		break;
+
+	case 'f':
+		match(is, "false", 5);
+		m_type = JSON_BOOLEAN;
+		m_value.boolean = false;
+		break;
+
+	case 'n':
+		match(is, "null", 4);
+		m_type = JSON_NULL;
+		break;
+
 	default:
 		if ((c >= '0' && c <= '9') || c == '-') {
 			/*
@@ -613,24 +668,6 @@ void Value::load(std::istream &is, bool lazy)
 				if (!parser) {
 					throw decode_error("Invalid integer");
 				}
-			}
-		} else if (isalpha(c)) {
-			std::string str;
-			while (!is.eof() && isalpha(c)) {
-				str += char(tolower(c));
-				is.get();
-				c = is.peek();
-			}
-			if (str == "true") {
-				m_type = JSON_BOOLEAN;
-				m_value.boolean = true;
-			} else if (str == "false") {
-				m_type = JSON_BOOLEAN;
-				m_value.boolean = false;
-			} else if (str == "null") {
-				m_type = JSON_NULL;
-			} else {
-				throw decode_error("Unknown keyword in input");
 			}
 		} else {
 			throw decode_error("Unknown character in input");
