@@ -22,6 +22,9 @@ void verify(const json::Value &value, const char *encoded)
 	parser.str(encoded);
 	parser.clear();
 	value2.load_all(parser, true);
+	parser.str(ss.str());
+	parser.clear();
+	value2.load_all(parser, true);
 }
 
 void verify_error(const char *s, const char *error)
@@ -63,6 +66,8 @@ int main()
 	verify(1234, "1234.");
 	verify(1234.56, "1234.56");
 	verify(-1234.56, "-1234.56");
+	verify(1234e10, "1234e10");
+	verify(1234e-10, "1234e-10");
 	verify("", "\"\"");
 	verify("foobar", "\"foobar\"");
 	verify(true, "true");
@@ -76,6 +81,12 @@ int main()
 	/* Floating points and integers should be treated as the same */
 	verify(1234.0, "1234");
 	verify(1234, "1234.0");
+	verify_error("1234e", "Invalid number");
+	verify_error("-", "Invalid number");
+	verify_error("-foo", "Invalid number");
+	verify_error("1-e2", "Invalid number");
+	verify_error("1-", "Invalid number");
+	verify_error("11111111111111111111", "Invalid number");
 
 	/* Test that unicode is converted to UTF-8 */
 	verify("snow\xE2\x98\x83man", "\"snow\\u2603man\"");
@@ -120,12 +131,11 @@ int main()
 	/* A list that contains an object */
 	std::vector<json::Value> arr2;
 	arr2.push_back(obj);
-	arr2.push_back(123);
-	verify(arr2, "[{\"bar\": [\"foo\", 1234, -1234.56, true], \"foo\": \"test\"}, 123]");
-	verify(arr2, "[{\"bar\":[\"foo\",1234 ,-1234.56,true],\"foo\":\"test\"} ,123\n, ]");
+	arr2.push_back(123e10);
+	verify(arr2, "[{\"bar\": [\"foo\", 1234, -1234.56, true], \"foo\": \"test\"}, 123e10]");
+	verify(arr2, "[{\"bar\":[\"foo\",1234 ,-1234.56,true],\"foo\":\"test\"} ,123e+10\n, ]");
 
 	verify_error("foobar", "Unknown keyword in input");
-	verify_error("-foo", "Expected a digit");
 	verify_error("trueorfalse", "Unknown keyword in input");
 	verify_error("\"foobar", "Unexpected end of input");
 	verify_error("\"foo\\xbar\"", "Unknown character entity");
@@ -135,7 +145,6 @@ int main()
 	verify_error("? ", "Unknown character in input");
 	verify_error("\"foo\nbar\"", "Control character in a string");
 	verify_error("\"foo\nbar\"", "Control character in a string");
-	verify_error("11111111111111111111", "Invalid integer");
 
 	try {
 		json::Value val;

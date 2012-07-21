@@ -470,21 +470,11 @@ void skip_array(std::istream &is)
 		default:
 			if ((c >= '0' && c <= '9') || c == '-') {
 				/* Skip over a number */
-				if (c == '-') {
+				while (!is.eof() && ((c >= '0' && c <= '9') ||
+						c == '.' || c == 'e' ||
+						c == '-' || c == '+')) {
 					is.get();
 					c = is.peek();
-				}
-				while (!is.eof() && c >= '0' && c <= '9') {
-					is.get();
-					c = is.peek();
-				}
-				if (c == '.') {
-					is.get();
-					c = is.peek();
-					while (!is.eof() && c >= '0' && c <= '9') {
-						is.get();
-						c = is.peek();
-					}
 				}
 			} else {
 				throw decode_error("Unknown character in input");
@@ -633,41 +623,33 @@ void Value::load(std::istream &is, bool lazy)
 			 * decide if it's a float or an intger.
 			 */
 			std::string str;
-			if (c == '-') {
-				str += char(c);
-				is.get();
-				c = is.peek();
-				if (c < '0' || c > '9') {
-					throw decode_error("Expected a digit");
+			bool is_float = false;
+			while (!is.eof() && ((c >= '0' && c <= '9') ||
+				c == '.' || c == 'e' || c == '-' || c == '+')) {
+				if (c == '.' || c == 'e') {
+					is_float = true;
 				}
-			}
-			while (!is.eof() && c >= '0' && c <= '9') {
 				str += char(c);
 				is.get();
 				c = is.peek();
 			}
-			if (c == '.') {
-				str += char(c);
-				is.get();
-				c = is.peek();
-				while (!is.eof() && c >= '0' && c <= '9') {
-					str += char(c);
-					is.get();
-					c = is.peek();
-				}
-				std::istringstream parser(str);
+			std::istringstream parser(str);
+			if (is_float) {
 				m_type = JSON_FLOATING;
 				parser >> m_value.floating;
 				if (!parser) {
-					throw decode_error("Invalid integer");
+					throw decode_error("Invalid number");
 				}
 			} else {
-				std::istringstream parser(str);
 				m_type = JSON_INTEGER;
 				parser >> m_value.integer;
 				if (!parser) {
-					throw decode_error("Invalid integer");
+					throw decode_error("Invalid number");
 				}
+			}
+			parser.get();
+			if (!parser.eof()) {
+				throw decode_error("Invalid number");
 			}
 		} else {
 			throw decode_error("Unknown character in input");
