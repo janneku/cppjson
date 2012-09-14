@@ -28,7 +28,10 @@ const std::string strf(const char *fmt, ...)
 	va_list vl;
 	va_start(vl, fmt);
 	char *buf = NULL;
-	vasprintf(&buf, fmt, vl);
+	if (vasprintf(&buf, fmt, vl) < 0) {
+		va_end(vl);
+		throw std::bad_alloc();
+	}
 	va_end(vl);
 	std::string s(buf);
 	free(buf);
