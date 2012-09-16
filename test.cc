@@ -124,7 +124,7 @@ int main()
 	verify(obj, "{\n\"bar\" :[ \"foo\" ,1234,-1234.56, true, ], \t\"foo\"\n: \"test\"\n,}");
 	verify_error("{\"foo\": ,} ", "Unknown character in input");
 	verify_error("{ \"foo\": 1234, ", "Unexpected end of input");
-	verify_error("{1234.56}", "Expected a string");
+	verify_error("{1234.56}", "Expected '}' or a string");
 	verify_error("{\"a\": [] ", "Expected ',' or '}'");
 	verify_error("{\"a\" 5 ", "Expected ':'");
 

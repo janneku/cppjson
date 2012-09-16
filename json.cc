@@ -256,11 +256,12 @@ bool Value::operator != (const Value &other) const
 }
 
 /* Skips over all spaces in the input. The stream can end up in EOF state. */
-void skip_space(std::istream &is)
+int skip_space(std::istream &is)
 {
+	int c;
 	while (1) {
-		int c = is.peek();
-		while (!is.eof() && isspace(c)) {
+		c = is.peek();
+		while (isspace(c)) {
 			is.get();
 			c = is.peek();
 		}
@@ -275,23 +276,14 @@ void skip_space(std::istream &is)
 		} else
 			break;
 	}
+	return c;
 }
 
 std::string load_string(std::istream &is)
 {
-	int c = is.get();
-	if (is.eof()) {
-		throw decode_error("Unexpected end of input");
-	}
-	if (c != '"') {
-		throw decode_error("Expected a string");
-	}
 	std::string str;
-	c = is.get();
+	int c = is.get();
 	while (c != '"') {
-		if (is.eof()) {
-			throw decode_error("Unexpected end of input");
-		}
 		if (c == '\\') {
 			c = is.get();
 			if (is.eof()) {
@@ -343,6 +335,8 @@ std::string load_string(std::istream &is)
 			uint8_t buffer[4];
 			size_t len = encode_utf8(c, buffer);
 			str.append((char *) buffer, len);
+		} else if (is.eof()) {
+			throw decode_error("Unexpected end of input");
 		} else if (c >= 0 && c <= 0x1F) {
 			 throw decode_error("Control character in a string");
 		} else {
@@ -354,7 +348,25 @@ std::string load_string(std::istream &is)
 	return str;
 }
 
-void write_string(std::ostream &os, const std::string &str)
+void skip_string(std::istream &is)
+{
+	int c = is.get();
+	while (c != '"') {
+		if (c == '\\') {
+			c = is.get();
+			if (is.eof()) {
+				throw decode_error("Unexpected end of input");
+			}
+		} else if (is.eof()) {
+			throw decode_error("Unexpected end of input");
+		} else if (c >= 0 && c <= 0x1F) {
+			 throw decode_error("Control character in a string");
+		}
+		c = is.get();
+	}
+}
+
+void encode_string(std::ostream &os, const std::string &str)
 {
 	os.put('"');
 	for (size_t i = 0; i < str.size(); ++i) {
@@ -417,38 +429,29 @@ void skip_array(std::istream &is)
 
 	while (depth > 0) {
 		skip_space(is);
-		if (is.eof()) {
-			throw decode_error("Unexpected end of input");
-		}
-		int c = is.peek();
+		int c = is.get();
 		switch (c) {
 		case '{':
 		case '[':
-			is.get();
 			depth++;
 			break;
 
 		case '}':
 		case ']':
-			is.get();
-			if (depth == 0) {
-				throw decode_error("Unpaired ']' or '}'");
-			}
 			depth--;
 			break;
 
 		case ':':
 		case ',':
-			is.get();
 			break;
 
 		case '"':
-			load_string(is);
+			skip_string(is);
 			break;
 
 		case 't':
 			/* true */
-			is.read(dummy, 4);
+			is.read(dummy, 3);
 			if (is.eof()) {
 				throw decode_error("Unexpected end of input");
 			}
@@ -456,7 +459,7 @@ void skip_array(std::istream &is)
 
 		case 'f':
 			/* false */
-			is.read(dummy, 5);
+			is.read(dummy, 4);
 			if (is.eof()) {
 				throw decode_error("Unexpected end of input");
 			}
@@ -464,7 +467,7 @@ void skip_array(std::istream &is)
 
 		case 'n':
 			/* null */
-			is.read(dummy, 4);
+			is.read(dummy, 3);
 			if (is.eof()) {
 				throw decode_error("Unexpected end of input");
 			}
@@ -473,12 +476,15 @@ void skip_array(std::istream &is)
 		default:
 			if ((c >= '0' && c <= '9') || c == '-') {
 				/* Skip over a number */
+				c = is.peek();
 				while (!is.eof() && ((c >= '0' && c <= '9') ||
 						c == '.' || c == 'e' ||
 						c == '-' || c == '+')) {
 					is.get();
 					c = is.peek();
 				}
+			} else if (is.eof()) {
+				throw decode_error("Unexpected end of input");
 			} else {
 				throw decode_error("Unknown character in input");
 			}
@@ -495,8 +501,8 @@ Value Value::load_next(bool *end, bool lazy)
 
 	Value val;
 
-	skip_space(*is);
-	if (is->peek() == ']') {
+	int c = skip_space(*is);
+	if (c == ']') {
 		/* End of the list, return null */
 		if (end != NULL) {
 			*end = true;
@@ -507,8 +513,7 @@ Value Value::load_next(bool *end, bool lazy)
 		}
 		val.load(*is, lazy);
 
-		skip_space(*is);
-		int c = is->peek();
+		c = skip_space(*is);
 		if (c == ',') {
 			is->get();
 		} else if (c != ']') {
@@ -529,18 +534,22 @@ void Value::load(std::istream &is, bool lazy)
 	 * anything else.
 	 */
 	skip_space(is);
-	if (is.eof()) {
-		throw decode_error("Unexpected end of input");
-	}
-	int c = is.peek();
+	int c = is.get();
 	switch (c) {
 	case '{':
-		is.get();
 		m_type = JSON_OBJECT;
 		m_value.object = new object_map_t;
 		skip_space(is);
-		while (is.peek() != '}') {
-			std::string key = load_string(is);
+		c = is.get();
+		while (c != '}') {
+			std::string key;
+			if (c == '"') {
+				key = load_string(is);
+			} else if (is.eof()) {
+				throw decode_error("Unexpected end of input");
+			} else {
+				throw decode_error("Expected '}' or a string");
+			}
 			skip_space(is);
 			if (is.get() != ':') {
 				throw decode_error("Expected ':'");
@@ -556,20 +565,18 @@ void Value::load(std::istream &is, bool lazy)
 			}
 			res.first->second.load(is, lazy);
 
-			skip_space(is);
-			c = is.peek();
+			c = skip_space(is);
 			if (c == ',') {
 				is.get();
 				skip_space(is);
 			} else if (c != '}') {
 				throw decode_error("Expected ',' or '}'");
 			}
+			c = is.get();
 		}
-		is.get();
 		break;
 
 	case '[':
-		is.get();
 		if (lazy) {
 			m_type = JSON_LAZY_ARRAY;
 			m_value.lazy = new LazyArray;
@@ -579,16 +586,15 @@ void Value::load(std::istream &is, bool lazy)
 		} else {
 			m_type = JSON_ARRAY;
 			m_value.array = new std::vector<Value>;
-			skip_space(is);
-			while (is.peek() != ']') {
+			c = skip_space(is);
+			while (c != ']') {
 				m_value.array->push_back(Value());
 				m_value.array->back().load(is, lazy);
 
-				skip_space(is);
-				c = is.peek();
+				c = skip_space(is);
 				if (c == ',') {
 					is.get();
-					skip_space(is);
+					c = skip_space(is);
 				} else if (c != ']') {
 					throw decode_error("Expected ',' or ']'");
 				}
@@ -603,19 +609,19 @@ void Value::load(std::istream &is, bool lazy)
 		break;
 
 	case 't':
-		match(is, "true", 4);
+		match(is, "rue", 3);
 		m_type = JSON_BOOLEAN;
 		m_value.boolean = true;
 		break;
 
 	case 'f':
-		match(is, "false", 5);
+		match(is, "alse", 4);
 		m_type = JSON_BOOLEAN;
 		m_value.boolean = false;
 		break;
 
 	case 'n':
-		match(is, "null", 4);
+		match(is, "ull", 3);
 		m_type = JSON_NULL;
 		break;
 
@@ -625,10 +631,13 @@ void Value::load(std::istream &is, bool lazy)
 			 * We need first to parse the number to a buffer to
 			 * decide if it's a float or an intger.
 			 */
-			std::string str;
 			bool is_float = false;
+			std::string str;
+			str += char(c);
+			c = is.peek();
 			while (!is.eof() && ((c >= '0' && c <= '9') ||
-				c == '.' || c == 'e' || c == '-' || c == '+')) {
+					c == '.' || c == 'e' ||
+					c == '-' || c == '+')) {
 				if (c == '.' || c == 'e') {
 					is_float = true;
 				}
@@ -654,6 +663,8 @@ void Value::load(std::istream &is, bool lazy)
 			if (!parser.eof()) {
 				throw decode_error("Invalid number");
 			}
+		} else if (is.eof()) {
+			throw decode_error("Unexpected end of input");
 		} else {
 			throw decode_error("Unknown character in input");
 		}
@@ -675,7 +686,7 @@ void Value::write(std::ostream &os, int indent) const
 
 	switch (m_type) {
 	case JSON_STRING:
-		write_string(os, *m_value.string);
+		encode_string(os, *m_value.string);
 		break;
 	case JSON_OBJECT:
 		os.put('{');
@@ -688,7 +699,7 @@ void Value::write(std::ostream &os, int indent) const
 				for (int n = 0; n < indent * depth; ++n)
 					os.put(' ');
 			}
-			write_string(os, i->first);
+			encode_string(os, i->first);
 			os << ": ";
 			i->second.write(os, indent);
 		}
