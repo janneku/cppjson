@@ -19,7 +19,7 @@ namespace json {
 
 struct LazyArray {
 	std::istream *is;
-	size_t offset;
+	std::istream::streampos offset;
 };
 
 /* Format a string, similar to sprintf() */
@@ -497,7 +497,15 @@ Value Value::load_next(bool *end, bool lazy)
 	verify_type(JSON_LAZY_ARRAY);
 
 	std::istream *is = m_value.lazy->is;
-	is->seekg(m_value.lazy->offset);
+	/*
+	 * Avoid seek, because GNU libstdc++ discards the contents of internal
+	 * buffer when file pointer changes.
+	 */
+	if (m_value.lazy->offset != is->tellg()) {
+		/* tellg() sets the stream state to bad. Clear it */
+		is->clear();
+		is->seekg(m_value.lazy->offset);
+	}
 
 	Value val;
 
