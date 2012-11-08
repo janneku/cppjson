@@ -5,20 +5,23 @@ Program code is licensed with GNU LGPL 2.1. See COPYING.LGPL file.
 
 See the example program (example.cc) that fetches and displays a Twitter feed.
 
-This library exposes just one class: json::Value. json::Value object 
-holds a single value or a recursive data structure. The available types 
-are: Null, integer, floating point number, string, boolean, an array of 
-Values, or an JSON object (key-value pairs). All numbers in JSON are 
-floating point, but this library tries to use 64-bit integers to store 
-numbers to avoid loss of precision. json::Value provides methods to load 
-the contents of the objects from from a JSON input, or serialize the 
-content as JSON. The objects act as any C++ values, and support 
-assigment and copying, and can be used in comparsions.
+This library exposes just one class: json::Value. json::Value holds a 
+single value or a recursive data structure used in JSON. The types are: 
+Null, integer, floating point number, string, boolean, an array, or an 
+JSON object (key-value pairs). All numbers in JSON are floating point, 
+but this library tries keep values as 64-bit integers to avoid loss of 
+precision. json::Value provides methods to load the contents of the 
+objects from from a JSON input, or serialize the content as JSON. Value 
+supports all standard C++ operations, such as assigment, copying, and 
+comparing equality.
+
+The JSON is expected to be ASCII or UTF-8 encoded, and the interface 
+uses UTF-8 strings stored as std::string.
 
 The library is designed to have high performance when loading large 
 structures: No expensive copying of large structures are performed, and 
-the decoder uses a stream object as the input which allows loading directly
-from a file without having to read into memory first.
+the decoder uses a stream object as the input which allows loading 
+directly from a file without having to read into memory first.
 
 To reduce the coded needed to validate incoming structures, the 
 json::Value has getters for different data types throw exceptions on 
@@ -27,9 +30,8 @@ type mismatch.
 Lazy loading
 ------------
 The decoder can be used to load files larger than the available memory. 
-Because such files often consist of huge arrays with tiny objects, the 
-decoder provides an option to skips over arrays in the input and 
-replaces them with special lazy arrays, which can be used to iterate over 
-the contents of the arrays sequentially. The objects keep an internal 
-reference to the original input stream so that the whole array doesn't 
-need to be loaded in the memory at once.
+The decoder has a setting to skip over arrays without loading them. The 
+arrays are replaced with place holder object LazyArray, which can be 
+then used to iterate the array sequentially. The place holder keeps an 
+internal reference to the original input stream so the orignal input 
+must not be closed.
